@@ -19,20 +19,21 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/can/platform/mcp251x.h>
 #include <linux/spi/spi.h>
 #include <linux/fb.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
 #include <linux/leds.h>
+#include <linux/clk.h>
 #include <linux/atmel-mci.h>
-#include <linux/delay.h>
+
+#include <linux/platform_data/at91_adc.h>
 
 #include <linux/platform_data/at91_adc.h>
 
 #include <mach/hardware.h>
 #include <video/atmel_lcdc.h>
-#include <media/soc_camera.h>
-#include <media/atmel-isi.h>
 
 #include <asm/setup.h>
 #include <asm/mach-types.h>
@@ -41,6 +42,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
+
 
 #include <mach/at91sam9_smc.h>
 #include <mach/system_rev.h>
@@ -51,6 +53,267 @@
 #include "sam9_smc.h"
 #include "generic.h"
 
+#include <linux/indigo-gpioperiph.h>
+#include <mach/indigo-revisions.h>
+
+static struct gpio_peripheral indigo_all_peripherals [8][3] = {
+	{ /* UNKNOWN DEVICE */
+	},
+	{ /* revision DEVICE_STARTERKIT -- 1 */
+	},
+	{ /* revision DEVICE_1_0 -- 2 */
+	},
+	{ /* revision DEVICE_1_1 -- 3 */
+	},
+	{ /* revision DEVICE_2_0 -- 4 */
+	},
+	{ /* revision DEVICE_2_1 -- 5 */
+		{
+			.kind = INDIGO_PERIPH_KIND_GPS,
+			.name = "gps",
+			.description = "NV08C-CSM GNSS",
+			.setup = gps_nv08c_csm_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "NET_ANT",
+					.description = "1 соответствует подключению ко входу активной антенны, 0 – Отсутствию",
+					.pin_no = AT91_PIN_PA31,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_RESET,
+					.schematics_name = "RST_GPS",
+					.description = "reset pin, active is low",
+					.pin_no = AT91_PIN_PB15,
+					.flags = GPIOF_DIR_OUT_INIT_HIGH
+				},
+				{
+					.function = INDIGO_FUNCTION_POWER,
+					.schematics_name = "EN_GPS",
+					.description = "enable GNSS module",
+					.pin_no = AT91_PIN_PD3,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW
+				}
+			}
+		},
+		{
+			.kind = INDIGO_PERIPH_KIND_POWER,
+			.name = "power",
+			.description = "BQ24032a",
+			.setup = indigo_do_nothing_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "STAT1",
+					.description = "stat 1"/*"Статус режиме работы:precharge in progress(S1-ON, S2-ON), fast charge in progress(S1-ON, S2-OFF), Charge done(S1-OFF, S2-ON),Charge suspend(S1-OFF, S2-OFF)."*/,
+					.pin_no = AT91_PIN_PD19,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "STAT2",
+					.description = "stat 2"/*"Статус режиме работы:precharge in progress(S1-ON, S2-ON), fast charge in progress(S1-ON, S2-OFF), Charge done(S1-OFF, S2-ON),Charge suspend(S1-OFF, S2-OFF)."*/,
+					.pin_no = AT91_PIN_PD11,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "Acpg",
+					.description = "состояние внешнего источника питания. 0 - хорошо, 1 - плохо",
+					.pin_no = AT91_PIN_PD30,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				/* --------------------------- debug pins here ----------------------- */
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT1",
+					.description = "",
+					.pin_no = AT91_PIN_PC20,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT2",
+					.description = "",
+					.pin_no = AT91_PIN_PC12,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT3",
+					.description = "",
+					.pin_no = AT91_PIN_PC22,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT4",
+					.description = "",
+					.pin_no = AT91_PIN_PC17,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+			}
+		},
+		{
+			.kind = INDIGO_PERIPH_KIND_GSM,
+			.name = "gsm",
+			.description = "Sim900 GSM",
+			.setup = gsm_sim900_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_STATUS,
+					.schematics_name = "STATUS_GSM",
+					.description = "Sim900 status pin",
+					.pin_no = AT91_PIN_PC31,
+					.flags = GPIOF_DIR_IN | GPIOF_DEGLITCH | GPIOF_ACTIVE_HIGH | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_PWRKEY,
+					.schematics_name = "PWRkey",
+					.description = "Sim900 power key pin",
+					.pin_no = AT91_PIN_PD22,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_POWER,
+					.schematics_name = "EN_GSM",
+					.description = "Sim900 power key pin",
+					.pin_no = AT91_PIN_PD21,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW,
+				}
+
+			}
+		}
+	},
+	{ /* revision DEVICE_STARTERKIT_9G45 -- 6 */
+	},
+		{ /* revision DEVICE_2_2 -- 7 */
+				{
+			.kind = INDIGO_PERIPH_KIND_GPS,
+			.name = "gps",
+			.description = "NV08C-CSM GNSS",
+			.setup = gps_nv08c_csm_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "NET_ANT",
+					.description = "1 соответствует подключению ко входу активной антенны, 0 – Отсутствию",
+					.pin_no = AT91_PIN_PB3,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_RESET,
+					.schematics_name = "RST_GPS",
+					.description = "reset pin, active is low",
+					.pin_no = AT91_PIN_PA31,
+					.flags = GPIOF_DIR_OUT_INIT_HIGH
+				},
+				{
+					.function = INDIGO_FUNCTION_POWER,
+					.schematics_name = "EN_GPS",
+					.description = "enable GNSS module",
+					.pin_no = AT91_PIN_PD3,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW
+				}
+			}
+		},
+		{
+			.kind = INDIGO_PERIPH_KIND_POWER,
+			.name = "power",
+			.description = "BQ24032a",
+			.setup = indigo_do_nothing_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "STAT1",
+					.description = "stat 1"/*"Статус режиме работы:precharge in progress(S1-ON, S2-ON), fast charge in progress(S1-ON, S2-OFF), Charge done(S1-OFF, S2-ON),Charge suspend(S1-OFF, S2-OFF)."*/,
+					.pin_no = AT91_PIN_PD19,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "STAT2",
+					.description = "stat 2"/*"Статус режиме работы:precharge in progress(S1-ON, S2-ON), fast charge in progress(S1-ON, S2-OFF), Charge done(S1-OFF, S2-ON),Charge suspend(S1-OFF, S2-OFF)."*/,
+					.pin_no = AT91_PIN_PD11,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "Acpg",
+					.description = "состояние внешнего источника питания. 0 - хорошо, 1 - плохо",
+					.pin_no = AT91_PIN_PD30,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				/* --------------------------- debug pins here ----------------------- */
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT1",
+					.description = "",
+					.pin_no = AT91_PIN_PC20,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT2",
+					.description = "",
+					.pin_no = AT91_PIN_PC12,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT3",
+					.description = "",
+					.pin_no = AT91_PIN_PC22,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT4",
+					.description = "",
+					.pin_no = AT91_PIN_PC17,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+			}
+		},
+		{
+			.kind = INDIGO_PERIPH_KIND_GSM,
+			.name = "gsm",
+			.description = "Sim900 GSM",
+			.setup = gsm_sim900_setup,
+			.active = false,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_STATUS,
+					.schematics_name = "STATUS_GSM",
+					.description = "Sim900 status pin",
+					.pin_no = AT91_PIN_PC7,
+					.flags = GPIOF_DIR_IN | GPIOF_DEGLITCH | GPIOF_ACTIVE_HIGH | GPIOF_PULLUP
+				},
+				{
+					.function = INDIGO_FUNCTION_PWRKEY,
+					.schematics_name = "PWRkey",
+					.description = "Sim900 power key pin",
+					.pin_no = AT91_PIN_PC31,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_POWER,
+					.schematics_name = "EN_GSM",
+					.description = "Sim900 power key pin",
+					.pin_no = AT91_PIN_PC27,
+					.flags = GPIOF_DIR_OUT_INIT_LOW | GPIOF_ACTIVE_LOW,
+				}
+
+			}
+		}
+	}
+};
 
 static void __init ek_init_early(void)
 {
@@ -63,31 +326,111 @@ static void __init ek_init_early(void)
  */
 static struct at91_usbh_data __initdata ek_usbh_hs_data = {
 	.ports		= 2,
-	.vbus_pin	= {AT91_PIN_PD1, AT91_PIN_PD3},
-	.vbus_pin_active_low = {1, 1},
+	.vbus_pin	= {-EINVAL, -EINVAL},
 	.overcurrent_pin= {-EINVAL, -EINVAL},
 };
 
+int setup_can_device(struct spi_device *device);
 
-/*
- * USB HS Device port
- */
-static struct usba_platform_data __initdata ek_usba_udc_data = {
-	.vbus_pin	= AT91_PIN_PB19,
+static struct mcp251x_platform_data mcp251x_info = {
+	.oscillator_frequency = 8 * 1000 * 1000,
+	.irq_flags            = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+	.board_specific_setup = setup_can_device,
+	.transceiver_enable   = NULL,
+	.power_enable         = NULL,
 };
-
 
 /*
  * SPI devices.
  */
 static struct spi_board_info ek_spi_devices[] = {
-	{	/* DataFlash chip */
-		.modalias	= "mtd_dataflash",
+	{	/* CAN */
+		.modalias	= "mcp2515",
 		.chip_select	= 0,
-		.max_speed_hz	= 15 * 1000 * 1000,
-		.bus_num	= 0,
+		.max_speed_hz	= 8 * 1000 * 1000,
+		.bus_num	= 1,
+		.platform_data  = &mcp251x_info,
+		.irq = 0
 	},
+	{
+		.modalias      = "l3gd20", // gyro
+		.chip_select   = 1,
+		.max_speed_hz  = 8 * 1000 * 1000,
+		.bus_num       = 1,
+		.platform_data = 0,
+		.irq           = 0,
+	},
+	{
+		.modalias     = "lis3lv02d", // accelerometer
+		.chip_select  = 2,
+		.max_speed_hz = 8 * 1000 * 1000,
+		.bus_num      = 1,
+		.irq          = 0,
+	}
 };
+
+static void setup_spi_devices(int revision)
+{
+	switch (revision) {
+	case DEVICE_2_2:
+		ek_spi_devices[0].irq = gpio_to_irq(AT91_PIN_PD12); /* FIXME: TO BE CHANGED LATER */
+		ek_spi_devices[1].irq = gpio_to_irq(AT91_PIN_PB1);
+		ek_spi_devices[2].irq = gpio_to_irq(AT91_PIN_PA22);
+		break;
+	}
+}
+
+
+/* called before probing CAN chip */
+int setup_can_device(struct spi_device *device)
+{
+	int reset_pin = -1;
+	int interrupt_pin = -1;
+	int phy_mode_pin = -1;
+
+	switch (indigo_revision) {
+	case DEVICE_2_1:
+		ek_spi_devices[0].bus_num = 0;
+		reset_pin = AT91_PIN_PA27;
+		interrupt_pin = AT91_PIN_PD12;
+		phy_mode_pin = AT91_PIN_PA18;
+		break;
+	case DEVICE_2_2:
+		ek_spi_devices[0].bus_num = 1;
+		reset_pin = AT91_PIN_PA28;
+		interrupt_pin = AT91_PIN_PB1;
+		phy_mode_pin = AT91_PIN_PA29;
+		break;
+	default:
+		break;
+	}
+
+	if (gpio_request(reset_pin, "MCP251x RESET")) {
+		printk(KERN_ERR "MAC251x failed to request RESET\n");
+		return -EBUSY;
+	}
+
+	/* set reset pin to inactive state */
+	gpio_direction_output(reset_pin, 1);
+
+	if (gpio_request(phy_mode_pin, "MAX3051 RS")) {
+		printk(KERN_ERR "MAX3051 failed to request MODE\n");
+		return -EBUSY;
+	}
+
+	/* enable phy highspeed operation */
+	gpio_direction_output(phy_mode_pin, 0);
+
+	if (gpio_request(interrupt_pin, "MCP251x INT")) {
+		printk(KERN_ERR "MAC251x failed to request INT\n");
+		return -EBUSY;
+	}
+
+	gpio_direction_input(interrupt_pin);
+	at91_set_deglitch(interrupt_pin, 1);
+
+	return 0;
+}
 
 
 /*
@@ -96,26 +439,9 @@ static struct spi_board_info ek_spi_devices[] = {
 static struct mci_platform_data __initdata mci0_data = {
 	.slot[0] = {
 		.bus_width	= 4,
-		.detect_pin	= AT91_PIN_PD10,
+		.detect_pin	= AT91_PIN_PA21,
 		.wp_pin		= -EINVAL,
 	},
-};
-
-static struct mci_platform_data __initdata mci1_data = {
-	.slot[0] = {
-		.bus_width	= 4,
-		.detect_pin	= AT91_PIN_PD11,
-		.wp_pin		= AT91_PIN_PD29,
-	},
-};
-
-
-/*
- * MACB Ethernet device
- */
-static struct macb_platform_data __initdata ek_macb_data = {
-	.phy_irq_pin	= AT91_PIN_PD5,
-	.is_rmii	= 1,
 };
 
 
@@ -124,12 +450,12 @@ static struct macb_platform_data __initdata ek_macb_data = {
  */
 static struct mtd_partition __initdata ek_nand_partition[] = {
 	{
-		.name	= "Partition 1",
+		.name	= "System Images",
 		.offset	= 0,
-		.size	= SZ_64M,
+		.size	= SZ_32M,
 	},
 	{
-		.name	= "Partition 2",
+		.name	= "Root partitions",
 		.offset	= MTDPART_OFS_NXTBLK,
 		.size	= MTDPART_SIZ_FULL,
 	},
@@ -137,114 +463,44 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
 
 /* det_pin is not connected */
 static struct atmel_nand_data __initdata ek_nand_data = {
-	.ale		= 21,
+	.ale		= 21, // не совсем понял, зачем нужны
 	.cle		= 22,
 	.rdy_pin	= AT91_PIN_PC8,
 	.enable_pin	= AT91_PIN_PC14,
 	.det_pin	= -EINVAL,
-	.ecc_mode	= NAND_ECC_SOFT,
-	.on_flash_bbt	= 1,
+	.ecc_mode       = NAND_ECC_SOFT,
+        .on_flash_bbt   = 1,
 	.parts		= ek_nand_partition,
 	.num_parts	= ARRAY_SIZE(ek_nand_partition),
 };
 
+/* timings for Samsung K9F2G08U0C 2Gbit */
 static struct sam9_smc_config __initdata ek_nand_smc_config = {
 	.ncs_read_setup		= 0,
-	.nrd_setup		= 2,
+	.nrd_setup		= 1,
 	.ncs_write_setup	= 0,
-	.nwe_setup		= 2,
+	.nwe_setup		= 1,
 
-	.ncs_read_pulse		= 4,
-	.nrd_pulse		= 4,
+	.ncs_read_pulse		= 2,
+	.nrd_pulse		= 2,
 	.ncs_write_pulse	= 4,
-	.nwe_pulse		= 4,
+	.nwe_pulse		= 2,
 
-	.read_cycle		= 7,
-	.write_cycle		= 7,
+	.read_cycle		= 4,
+	.write_cycle		= 4,
 
 	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE,
-	.tdf_cycles		= 3,
+	.tdf_cycles		= 2,
 };
 
 static void __init ek_add_device_nand(void)
 {
-	ek_nand_data.bus_width_16 = board_have_nand_16bit();
-	/* setup bus-width (8 or 16) */
-	if (ek_nand_data.bus_width_16)
-		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-	else
-		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+	ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
 
 	/* configure chip-select 3 (NAND) */
 	sam9_smc_configure(0, 3, &ek_nand_smc_config);
-
 	at91_add_device_nand(&ek_nand_data);
 }
-
-
-/*
- *  ISI
- */
-static struct isi_platform_data __initdata isi_data = {
-	.frate			= ISI_CFG1_FRATE_CAPTURE_ALL,
-	/* to use codec and preview path simultaneously */
-	.full_mode		= 1,
-	.data_width_flags	= ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
-	/* ISI_MCK is provided by programmable clock or external clock */
-	.mck_hz			= 25000000,
-};
-
-
-/*
- * soc-camera OV2640
- */
-#if defined(CONFIG_SOC_CAMERA_OV2640) || \
-	defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
-static unsigned long isi_camera_query_bus_param(struct soc_camera_link *link)
-{
-	/* ISI board for ek using default 8-bits connection */
-	return SOCAM_DATAWIDTH_8;
-}
-
-static int i2c_camera_power(struct device *dev, int on)
-{
-	/* enable or disable the camera */
-	pr_debug("%s: %s the camera\n", __func__, on ? "ENABLE" : "DISABLE");
-	at91_set_gpio_output(AT91_PIN_PD13, !on);
-
-	if (!on)
-		goto out;
-
-	/* If enabled, give a reset impulse */
-	at91_set_gpio_output(AT91_PIN_PD12, 0);
-	msleep(20);
-	at91_set_gpio_output(AT91_PIN_PD12, 1);
-	msleep(100);
-
-out:
-	return 0;
-}
-
-static struct i2c_board_info i2c_camera = {
-	I2C_BOARD_INFO("ov2640", 0x30),
-};
-
-static struct soc_camera_link iclink_ov2640 = {
-	.bus_id			= 0,
-	.board_info		= &i2c_camera,
-	.i2c_adapter_id		= 0,
-	.power			= i2c_camera_power,
-	.query_bus_param	= isi_camera_query_bus_param,
-};
-
-static struct platform_device isi_ov2640 = {
-	.name	= "soc-camera-pdrv",
-	.id	= 0,
-	.dev	= {
-		.platform_data = &iclink_ov2640,
-	},
-};
-#endif
 
 
 /*
@@ -253,14 +509,14 @@ static struct platform_device isi_ov2640 = {
 #if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
 static struct fb_videomode at91_tft_vga_modes[] = {
 	{
-		.name           = "LG",
+		.name           = "SK",
 		.refresh	= 60,
-		.xres		= 480,		.yres		= 272,
-		.pixclock	= KHZ2PICOS(9000),
+		.xres		= 800,		.yres		= 480,
+		.pixclock	= KHZ2PICOS(29232),// (800 + 40 + 40 + 48) * (480 + 29 + 13 + 3) * 60
 
-		.left_margin	= 1,		.right_margin	= 1,
-		.upper_margin	= 40,		.lower_margin	= 1,
-		.hsync_len	= 45,		.vsync_len	= 1,
+		.left_margin	= 40,		.right_margin	= 40,
+		.upper_margin	= 29,		.lower_margin	= 13,
+		.hsync_len	= 48,		.vsync_len	= 3,
 
 		.sync		= 0,
 		.vmode		= FB_VMODE_NONINTERLACED,
@@ -268,51 +524,43 @@ static struct fb_videomode at91_tft_vga_modes[] = {
 };
 
 static struct fb_monspecs at91fb_default_monspecs = {
-	.manufacturer	= "LG",
-	.monitor        = "LB043WQ1",
+	.manufacturer	= "Ingo",
+	.monitor        = "Dev2.1DS",
 
 	.modedb		= at91_tft_vga_modes,
 	.modedb_len	= ARRAY_SIZE(at91_tft_vga_modes),
 	.hfmin		= 15000,
-	.hfmax		= 17640,
-	.vfmin		= 57,
-	.vfmax		= 67,
+	.hfmax		= 64000,
+	.vfmin		= 50,
+	.vfmax		= 150,
 };
 
 #define AT91SAM9G45_DEFAULT_LCDCON2 	(ATMEL_LCDC_MEMOR_LITTLE \
-					| ATMEL_LCDC_DISTYPE_TFT \
+					| ATMEL_LCDC_DISTYPE_TFT	\
 					| ATMEL_LCDC_CLKMOD_ALWAYSACTIVE)
 
 /* Driver datas */
 static struct atmel_lcdfb_info __initdata ek_lcdc_data = {
 	.lcdcon_is_backlight		= true,
-	.default_bpp			= 32,
+//	.default_bpp			= 32,
+	.default_bpp			= 16,
 	.default_dmacon			= ATMEL_LCDC_DMAEN,
 	.default_lcdcon2		= AT91SAM9G45_DEFAULT_LCDCON2,
 	.default_monspecs		= &at91fb_default_monspecs,
-	.guard_time			= 9,
+	.guard_time			= 15,
 	.lcd_wiring_mode		= ATMEL_LCDC_WIRING_RGB,
+	.smem_len			= 0,
 };
 
 #else
 static struct atmel_lcdfb_info __initdata ek_lcdc_data;
 #endif
 
-
-/*
- * Touchscreen
- */
-static struct at91_tsadcc_data ek_tsadcc_data = {
-	.adc_clock		= 300000,
-	.pendet_debounce	= 0x0d,
-	.ts_sample_hold_time	= 0x0a,
-};
-
 /*
  * ADCs
  */
 static struct at91_adc_data ek_adc_data = {
-	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7),
+	.channels_used = BIT(4) | BIT(5) | BIT(6) | BIT(7),
 	.use_external_triggers = true,
 	.vref = 3300,
 };
@@ -322,52 +570,70 @@ static struct at91_adc_data ek_adc_data = {
  */
 #if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
 static struct gpio_keys_button ek_buttons[] = {
-	{	/* BP1, "leftclic" */
-		.code		= BTN_LEFT,
-		.gpio		= AT91_PIN_PB6,
-		.active_low	= 1,
-		.desc		= "left_click",
-		.wakeup		= 1,
-	},
-	{	/* BP2, "rightclic" */
-		.code		= BTN_RIGHT,
-		.gpio		= AT91_PIN_PB7,
-		.active_low	= 1,
-		.desc		= "right_click",
-		.wakeup		= 1,
-	},
-		/* BP3, "joystick" */
 	{
 		.code		= KEY_LEFT,
-		.gpio		= AT91_PIN_PB14,
-		.active_low	= 1,
-		.desc		= "Joystick Left",
+		.gpio		= AT91_PIN_PA23,
+		.desc		= "KEY1",
+		.debounce_interval = 50,
 	},
 	{
 		.code		= KEY_RIGHT,
-		.gpio		= AT91_PIN_PB15,
-		.active_low	= 1,
-		.desc		= "Joystick Right",
+		.gpio		= AT91_PIN_PD2,
+		.desc		= "KEY2",
+		.debounce_interval = 50,
 	},
 	{
 		.code		= KEY_UP,
-		.gpio		= AT91_PIN_PB16,
-		.active_low	= 1,
-		.desc		= "Joystick Up",
+		.gpio		= AT91_PIN_PA24,
+		.desc		= "KEY3",
+		.debounce_interval = 50,
 	},
 	{
 		.code		= KEY_DOWN,
-		.gpio		= AT91_PIN_PB17,
-		.active_low	= 1,
-		.desc		= "Joystick Down",
+		.gpio		= AT91_PIN_PA26,
+		.desc		= "KEY4",
+		.debounce_interval = 50,
 	},
 	{
 		.code		= KEY_ENTER,
-		.gpio		= AT91_PIN_PB18,
-		.active_low	= 1,
-		.desc		= "Joystick Press",
+		.gpio		= AT91_PIN_PE31,
+		.desc		= "KEY5",
+		.debounce_interval = 50,
 	},
+	{	/* BP1, "leftclick" */
+		.code		= KEY_ESC,
+		.gpio		= AT91_PIN_PB14,
+		.desc		= "KEY6",
+		.debounce_interval = 50,
+	},
+
 };
+
+static void setup_keys(int revision) {
+	switch (revision) {
+	case DEVICE_2_2:
+		ek_buttons[0].code = KEY_ENTER;
+		ek_buttons[0].gpio = AT91_PIN_PA11;
+
+		ek_buttons[1].code = KEY_ESC;
+		ek_buttons[1].gpio = AT91_PIN_PA18;
+
+		ek_buttons[2].code = KEY_DOWN;
+		ek_buttons[2].gpio = AT91_PIN_PD14;
+
+		ek_buttons[3].code = KEY_RIGHT;
+		ek_buttons[3].gpio = AT91_PIN_PD10;
+
+		ek_buttons[4].code = KEY_UP;
+		ek_buttons[4].gpio = AT91_PIN_PB25;
+
+		ek_buttons[5].code = KEY_LEFT;
+		ek_buttons[5].gpio = AT91_PIN_PB28;
+		break;
+	default:
+		break;
+	}
+}
 
 static struct gpio_keys_platform_data ek_button_data = {
 	.buttons	= ek_buttons,
@@ -388,7 +654,8 @@ static void __init ek_add_device_buttons(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ek_buttons); i++) {
-		at91_set_GPIO_periph(ek_buttons[i].gpio, 1);
+		/* на 2.1 кнопки физически подтянуты вниз, не делаем pullup */
+		at91_set_GPIO_periph(ek_buttons[i].gpio, 0);
 		at91_set_deglitch(ek_buttons[i].gpio, 1);
 	}
 
@@ -398,109 +665,186 @@ static void __init ek_add_device_buttons(void)
 static void __init ek_add_device_buttons(void) {}
 #endif
 
+static struct gpio_led ek_leds[] = {
+        {       /* "are we still alive" */
+                .name                   = "alive",
+                .gpio                   = AT91_PIN_PC27,
+                .default_trigger        = "heartbeat",
+        },
+};
 
 /*
  * AC97
- * reset_pin is not connected: NRST
  */
 static struct ac97c_platform_data ek_ac97_data = {
-	.reset_pin	= -EINVAL,
+	.reset_pin	= AT91_PIN_PC21,
 };
 
+static unsigned long int device_mask(int kind) {
+	unsigned long int result = 0;
+	if (kind == 0) {
+		printk(KERN_ERR "this would surely lead to memory corruption\n");
+		BUG();
+	} else if (kind > 0 && kind < 31) {
+		set_bit(32 - kind, &result);
+	}
+	return result;
+}
 
-/*
- * LEDs ... these could all be PWM-driven, for variable brightness
- */
-static struct gpio_led ek_leds[] = {
-	{	/* "top" led, red, powerled */
-		.name			= "d8",
-		.gpio			= AT91_PIN_PD30,
-		.default_trigger	= "heartbeat",
-	},
-	{	/* "left" led, green, userled2, pwm3 */
-		.name			= "d6",
-		.gpio			= AT91_PIN_PD0,
-		.active_low		= 1,
-		.default_trigger	= "nand-disk",
-	},
-#if !(defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE))
-	{	/* "right" led, green, userled1, pwm1 */
-		.name			= "d7",
-		.gpio			= AT91_PIN_PD31,
-		.active_low		= 1,
-		.default_trigger	= "mmc0",
-	},
-#endif
+static int find_device_by_kind(enum indigo_gpioperiph_kind_t kind, struct gpio_peripheral peripherals[3]) {
+	int i = 0;
+	int index = -1;
+	for (i = 0; i < 3; i++) {
+		if (peripherals[i].kind == kind) {
+			index = i;
+			goto out;
+		}
+	}
+
+	printk(KERN_ERR "couldn't find kind %d\n", kind);
+	BUG();
+
+out:
+	return index;
+
+}
+
+enum general_peripherals {
+	p_usb = 1 << 16,
+	p_spi = 1 << 17,
+	p_mci = 1 << 18,
+	p_lcd = 1 << 19,
+	p_ac97 = 1 << 20,
+	p_rs485 = 1 << 21,
 };
 
+static int setup_rs485(void) {
+	int receiver_enable_pin = -1;
+	//	int driver_enable_pin = -1;
 
-/*
- * PWM Leds
- */
-static struct gpio_led ek_pwm_led[] = {
-#if defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE)
-	{	/* "right" led, green, userled1, pwm1 */
-		.name			= "d7",
-		.gpio			= 1,	/* is PWM channel number */
-		.active_low		= 1,
-		.default_trigger	= "none",
-	},
-#endif
-};
+	switch (indigo_revision) {
+	case DEVICE_2_1:
+		receiver_enable_pin = AT91_PIN_PA22;
 
-static struct platform_device *devices[] __initdata = {
-#if defined(CONFIG_SOC_CAMERA_OV2640) || \
-	defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
-	&isi_ov2640,
-#endif
-};
+		/*
+		   DE is part of corresponding UART
+		   driver_enable_pin = AT91_PIN_PA23;
+		*/
+		break;
+	default:
+		break;
+	}
+
+	if (gpio_request(receiver_enable_pin, "ADM3485 RE")) {
+		printk(KERN_ERR "ADM3485 failed to request RE\n");
+		return -EBUSY;
+	}
+
+	/* set reset pin to inactive state */
+	gpio_direction_output(receiver_enable_pin, 0);
+
+	return 0;
+}
+
+void handle_device_versions(int revision)
+{
+	switch (revision) {
+	case DEVICE_2_1:
+		break;
+	case DEVICE_2_2:
+		break;
+	}
+}
 
 static void __init ek_board_init(void)
 {
-	/* Serial */
+	int kind = 0, j = 0;
+
+	handle_device_versions(indigo_revision);
+
 	/* DGBU on ttyS0. (Rx & Tx only) */
 	at91_register_uart(0, 0, 0);
 
-	/* USART0 not connected on the -EK board */
-	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-	at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
+	/* ttyS1 == GSM */
+	at91_register_uart(AT91SAM9G45_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
+
+	/* ttyS2 == GPS */
+	at91_register_uart(AT91SAM9G45_ID_US2, 2, 0);
+
+	/* ttyS3 = external RS232 */
+	at91_register_uart(AT91SAM9G45_ID_US0, 3, 0);
+
+	/* ttyS4 == external RS485 */
+	at91_register_uart(AT91SAM9G45_ID_US3, 4, ATMEL_UART_RTS);
+
+	/* Serial */
 	at91_add_device_serial();
+
+	if (indigo_hardware & p_rs485)
+		setup_rs485();
+	else
+		printk(KERN_INFO "not enabling RS-485 transceiver, fix system_rev\n");
+
 	/* USB HS Host */
-	at91_add_device_usbh_ohci(&ek_usbh_hs_data);
-	at91_add_device_usbh_ehci(&ek_usbh_hs_data);
-	/* USB HS Device */
-	at91_add_device_usba(&ek_usba_udc_data);
-	/* SPI */
-	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
-	/* MMC */
-	at91_add_device_mci(0, &mci0_data);
-	at91_add_device_mci(1, &mci1_data);
-	/* Ethernet */
-	at91_add_device_eth(&ek_macb_data);
+	if (indigo_hardware & p_usb) {
+		at91_add_device_usbh_ohci(&ek_usbh_hs_data);
+		at91_add_device_usbh_ehci(&ek_usbh_hs_data);
+	} else
+		printk(KERN_INFO "not enabling USB, fix system_rev\n");
+
+        /* SPI */
+	setup_spi_devices(indigo_revision);
+	if (indigo_hardware & p_spi)
+		at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
+	else
+		printk(KERN_INFO "not enabling SPI (CAN, etc), fix system rev\n");
+
+        /* MMC */
+	if (indigo_hardware & p_mci)
+		at91_add_device_mci(0, &mci0_data);
+	else
+		printk(KERN_INFO "not enabling MMC, fix system rev\n");
 	/* NAND */
 	ek_add_device_nand();
-	/* I2C */
-	at91_add_device_i2c(0, NULL, 0);
-	/* ISI, using programmable clock as ISI_MCK */
-	at91_add_device_isi(&isi_data, true);
 	/* LCD Controller */
-	at91_add_device_lcdc(&ek_lcdc_data);
-	/* Touch Screen */
-	at91_add_device_tsadcc(&ek_tsadcc_data);
+	if (indigo_hardware & p_lcd) {
+		at91_add_device_lcdc(&ek_lcdc_data);
+		gpio_request(AT91_PIN_PA24, "backlight");
+		gpio_direction_output(AT91_PIN_PA24, 1);
+	} else
+		printk(KERN_INFO "not enabling LCD, fix system rev\n");
+
+	/* FIXME conditional enabling */
 	/* ADC */
 	at91_add_device_adc(&ek_adc_data);
 	/* Push Buttons */
+	setup_keys(indigo_revision);
 	ek_add_device_buttons();
-	/* AC97 */
-	at91_add_device_ac97(&ek_ac97_data);
 	/* LEDs */
 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
-	at91_pwm_leds(ek_pwm_led, ARRAY_SIZE(ek_pwm_led));
-	/* Other platform devices */
-	platform_add_devices(devices, ARRAY_SIZE(devices));
+	/* AC97 */
+	if (indigo_hardware & p_ac97)
+		at91_add_device_ac97(&ek_ac97_data);
+	else
+		printk(KERN_INFO "not enabling AC97, fix system rev\n");
+
+#ifdef CONFIG_INDIGO_GPIO_PERIPH
+	for (kind = 1; kind < 4; kind++) { /* 1, 2, 3 literally here */
+		if (indigo_hardware & device_mask(kind)) {
+			j = find_device_by_kind(kind, indigo_all_peripherals[indigo_revision]);
+			if (j != -1)
+				indigo_all_peripherals[indigo_revision][j].active = true;
+			else
+				printk(KERN_ERR "unknown periph kind: %d\n", kind);
+
+		}
+	}
+	indigo_gpio_peripheral_init(indigo_all_peripherals[indigo_revision]);
+#endif
+
 }
 
-MACHINE_START(AT91SAM9M10G45EK, "Atmel AT91SAM9M10G45-EK")
+MACHINE_START(AT91SAM9G45EKES, "Indigo Tracker 2.1")
 	/* Maintainer: Atmel */
 	.timer		= &at91sam926x_timer,
 	.map_io		= at91_map_io,

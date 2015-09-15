@@ -978,6 +978,11 @@ static struct resource lcdc_resources[] = {
 		.end	= NR_IRQS_LEGACY + AT91SAM9G45_ID_LCDC,
 		.flags	= IORESOURCE_IRQ,
 	},
+	[2] = { /* video memory lies in end of DDR2 */
+		.start = 0x20000000 + SZ_32M - SZ_2M,
+		.end   = 0x20000000 + SZ_32M - 1 ,
+		.flags = IORESOURCE_MEM,
+	}
 };
 
 static struct platform_device at91_lcdc_device = {

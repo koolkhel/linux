@@ -4,6 +4,13 @@
 
 menu "Misc devices"
 
+config INDIGO_GPIO_PERIPH
+	tristate "Indigo handmade driver for peripheral handling"
+	depends on SYSFS
+	help
+	My super cool driver
+	default n
+
 config SENSORS_LIS3LV02D
 	tristate
 	depends on INPUT
