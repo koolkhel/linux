@@ -10,6 +10,8 @@
 
 #include <mach/gpio.h>
 
+#define INDIGO_PERIPH_COUNT 4
+
 #define INDIGO_MAX_GPIOPERIPH_PIN_COUNT 32
 #define INDIGO_NO_PIN 255
 

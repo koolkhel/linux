@@ -1853,7 +1853,7 @@ static void destroy_gpio_peripheral_obj(struct gpio_peripheral_obj *gpio_periphe
 }
 
 /* единственный ужас -- 3 устройства */
-static struct gpio_peripheral indigo_gpioperiph_platform_data[3];
+static struct gpio_peripheral indigo_gpioperiph_platform_data[INDIGO_PERIPH_COUNT];
 
 /* здесь вообще нужно выставить имя, а в борде сказать, что мы хотим драйвер с этим именем и вот его platform_data */
 
@@ -1869,12 +1869,12 @@ static struct platform_device indigo_gpioperiph_device = {
 #endif
 
 /* nothing enabled by default */
-static struct gpio_peripheral enabled_peripherals[3];
+static struct gpio_peripheral enabled_peripherals[INDIGO_PERIPH_COUNT];
 
 /**
  * Entry point of driver
  */
-int indigo_gpio_peripheral_init(struct gpio_peripheral peripherals[3])
+int indigo_gpio_peripheral_init(struct gpio_peripheral peripherals[INDIGO_PERIPH_COUNT])
 {
 	int result = 0;
 
@@ -1888,7 +1888,7 @@ int indigo_gpio_peripheral_init(struct gpio_peripheral peripherals[3])
 		goto out;
 	}
 
-	memcpy(&indigo_gpioperiph_platform_data, peripherals, sizeof(peripherals[0]) * 3);
+	memcpy(&indigo_gpioperiph_platform_data, peripherals, sizeof(peripherals[0]) * INDIGO_PERIPH_COUNT);
 
 	indigo_cmd_mem_cache = kmem_cache_create("indigo_periph_cmd",
 						sizeof(struct gpio_peripheral_command),
@@ -1901,7 +1901,7 @@ int indigo_gpio_peripheral_init(struct gpio_peripheral peripherals[3])
 		goto out;
 	}
 
-	memcpy(&enabled_peripherals[0], &peripherals[0], sizeof(peripherals[0]) * 3);
+	memcpy(&enabled_peripherals[0], &peripherals[0], sizeof(peripherals[0]) * INDIGO_PERIPH_COUNT);
 	//	platform_device_register(&indigo_gpioperiph_device);
 
 
@@ -1915,7 +1915,7 @@ static int indigo_gpio_peripheral_enable(void)
 	int i;
 	struct gpio_peripheral_obj *periph_obj;
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < INDIGO_PERIPH_COUNT; i++) {
 		if (!enabled_peripherals[i].active) {
 			printk(KERN_ERR "skipping device %s\n", enabled_peripherals[i].description);
 			continue;
