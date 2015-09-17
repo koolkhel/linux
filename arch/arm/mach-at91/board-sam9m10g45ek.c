@@ -385,13 +385,6 @@ static struct mcp251x_platform_data mcp251x_info = {
 	.power_enable         = NULL,
 };
 
-static struct lis3lv02d_platform_data acc_data = {
-	.irq_cfg = 0,
-	.irq_flags1 = (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING), /* Additional irq edge / level flags */
-	.irq_flags2 = 0, /* Additional irq edge / level flags */
-	.irq2 = 0
-};
-
 /*
  * SPI devices.
  */
@@ -413,11 +406,11 @@ static struct spi_board_info ek_spi_devices[] = {
 		.irq           = 0,
 	},
 	{
-		.modalias      = "lis3lv02d", // accelerometer
+		.modalias      = "lis3lv02d_spi", // accelerometer
 		.chip_select   = 2,
 		.max_speed_hz  = 8 * 1000 * 1000,
 		.bus_num       = 1,
-		.platform_data = &acc_data,
+		.platform_data = 0,
 		.irq           = 0,
 	}
 };
@@ -425,37 +418,30 @@ static struct spi_board_info ek_spi_devices[] = {
 void setup_spi_devices(void)
 {
 	int pin = -1;
-	switch (indigo_revision) {
-	case DEVICE_2_2:
-		// CAN
-		ek_spi_devices[0].irq = gpio_to_irq(AT91_PIN_PA26);
+	// CAN
+	ek_spi_devices[0].irq = gpio_to_irq(AT91_PIN_PA26);
 
-                // GYRO
-		pin = AT91_PIN_PB1;
-		ek_spi_devices[1].irq = gpio_to_irq(pin);
-		if (gpio_request(pin, "L3GD20 INT")) {
-			printk(KERN_ERR "L3GD20 INT failed to request INT\n");
-			BUG();
-		}
-
-		gpio_direction_input(pin);
-		at91_set_deglitch(pin, 1);
-
-		// ACCELEROMETER
-		pin = AT91_PIN_PA22;
-		ek_spi_devices[2].irq = gpio_to_irq(pin);
-		if (gpio_request(pin, "lis3lv02d INT")) {
-			printk(KERN_ERR "lis3lv02d failed to request INT\n");
-			BUG();
-		}
-
-		gpio_direction_input(pin);
-		at91_set_deglitch(pin, 1);
-
-		break;
-	default:
+	// GYRO
+	pin = AT91_PIN_PB1;
+	ek_spi_devices[1].irq = gpio_to_irq(pin);
+	if (gpio_request(pin, "L3GD20 INT")) {
+		printk(KERN_ERR "L3GD20 INT failed to request INT\n");
 		BUG();
 	}
+
+	gpio_direction_input(pin);
+	at91_set_deglitch(pin, 1);
+
+	// ACCELEROMETER
+	pin = AT91_PIN_PA22;
+	ek_spi_devices[2].irq = gpio_to_irq(pin);
+	if (gpio_request(pin, "lis3lv02d INT")) {
+		printk(KERN_ERR "lis3lv02d failed to request INT\n");
+		BUG();
+	}
+
+	gpio_direction_input(pin);
+	at91_set_deglitch(pin, 1);
 }
 
 
@@ -923,8 +909,6 @@ static void __init ek_board_init(void)
 	/* LCD Controller */
 	if (indigo_hardware & p_lcd) {
 		at91_add_device_lcdc(&ek_lcdc_data);
-		gpio_request(AT91_PIN_PA24, "backlight");
-		gpio_direction_output(AT91_PIN_PA24, 0);
 	} else
 		printk(KERN_INFO "not enabling LCD, fix system rev\n");
 

@@ -936,8 +936,7 @@ static void lis3lv02d_8b_configure(struct lis3lv02d *lis3,
 		err = request_threaded_irq(p->irq2,
 					NULL,
 					lis302dl_interrupt_thread2_8b,
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT |
-					(p->irq_flags2 & IRQF_TRIGGER_MASK),
+					IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 					DRIVER_NAME, lis3);
 		if (err < 0)
 			pr_err("No second IRQ. Limited functionality\n");
@@ -1219,8 +1218,7 @@ int lis3lv02d_init_device(struct lis3lv02d *lis3)
 
 	err = request_threaded_irq(lis3->irq, lis302dl_interrupt,
 				thread_fn,
-				IRQF_TRIGGER_RISING | IRQF_ONESHOT |
-				irq_flags,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 				DRIVER_NAME, lis3);
 
 	if (err < 0) {

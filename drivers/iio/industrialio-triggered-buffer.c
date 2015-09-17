@@ -57,7 +57,7 @@ int iio_triggered_buffer_setup(struct iio_dev *indio_dev,
 
 	indio_dev->pollfunc = iio_alloc_pollfunc(pollfunc_bh,
 						 pollfunc_th,
-						 IRQF_ONESHOT,
+						 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 						 indio_dev,
 						 "%s_consumer%d",
 						 indio_dev->name,
