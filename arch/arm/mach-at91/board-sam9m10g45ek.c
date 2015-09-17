@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/can/platform/mcp251x.h>
+#include <linux/lis3lv02d.h>
 #include <linux/spi/spi.h>
 #include <linux/fb.h>
 #include <linux/gpio_keys.h>
@@ -56,7 +57,7 @@
 #include <linux/indigo-gpioperiph.h>
 #include <mach/indigo-revisions.h>
 
-static struct gpio_peripheral indigo_all_peripherals [8][3] = {
+static struct gpio_peripheral indigo_all_peripherals [DEVICE_2_2 + 1][INDIGO_PERIPH_COUNT] = {
 	{ /* UNKNOWN DEVICE */
 	},
 	{ /* revision DEVICE_STARTERKIT -- 1 */
@@ -103,7 +104,7 @@ static struct gpio_peripheral indigo_all_peripherals [8][3] = {
 			.name = "power",
 			.description = "BQ24032a",
 			.setup = indigo_do_nothing_setup,
-			.active = false,
+			.active = 1,
 			.pins = {
 				{
 					.function = INDIGO_FUNCTION_NO_FUNCTION,
@@ -162,7 +163,7 @@ static struct gpio_peripheral indigo_all_peripherals [8][3] = {
 			.name = "gsm",
 			.description = "Sim900 GSM",
 			.setup = gsm_sim900_setup,
-			.active = false,
+			.active = 1,
 			.pins = {
 				{
 					.function = INDIGO_FUNCTION_STATUS,
@@ -191,8 +192,8 @@ static struct gpio_peripheral indigo_all_peripherals [8][3] = {
 	},
 	{ /* revision DEVICE_STARTERKIT_9G45 -- 6 */
 	},
-		{ /* revision DEVICE_2_2 -- 7 */
-				{
+	{ /* revision DEVICE_2_2 -- 7 */
+		{
 			.kind = INDIGO_PERIPH_KIND_GPS,
 			.name = "gps",
 			.description = "NV08C-CSM GNSS",
@@ -251,34 +252,6 @@ static struct gpio_peripheral indigo_all_peripherals [8][3] = {
 					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
 				},
 				/* --------------------------- debug pins here ----------------------- */
-				{
-					.function = INDIGO_FUNCTION_NO_FUNCTION,
-					.schematics_name = "OUT1",
-					.description = "",
-					.pin_no = AT91_PIN_PC20,
-					.flags = GPIOF_DIR_OUT_INIT_LOW
-				},
-				{
-					.function = INDIGO_FUNCTION_NO_FUNCTION,
-					.schematics_name = "OUT2",
-					.description = "",
-					.pin_no = AT91_PIN_PC12,
-					.flags = GPIOF_DIR_OUT_INIT_LOW
-				},
-				{
-					.function = INDIGO_FUNCTION_NO_FUNCTION,
-					.schematics_name = "OUT3",
-					.description = "",
-					.pin_no = AT91_PIN_PC22,
-					.flags = GPIOF_DIR_OUT_INIT_LOW
-				},
-				{
-					.function = INDIGO_FUNCTION_NO_FUNCTION,
-					.schematics_name = "OUT4",
-					.description = "",
-					.pin_no = AT91_PIN_PC17,
-					.flags = GPIOF_DIR_OUT_INIT_LOW
-				},
 			}
 		},
 		{
@@ -311,6 +284,78 @@ static struct gpio_peripheral indigo_all_peripherals [8][3] = {
 				}
 
 			}
+		},
+		{
+			.kind = INDIGO_PERIPH_KIND_UNKNOWN,
+			.name = "io",
+			.description = "Various IO",
+			.setup = indigo_do_nothing_setup,
+			.active = true,
+			.pins = {
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT1",
+					.description = "",
+					.pin_no = AT91_PIN_PC20,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT2",
+					.description = "",
+					.pin_no = AT91_PIN_PC12,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT3",
+					.description = "",
+					.pin_no = AT91_PIN_PC22,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "OUT4",
+					.description = "",
+					.pin_no = AT91_PIN_PC17,
+					.flags = GPIOF_DIR_OUT_INIT_LOW
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "uC_in1",
+					.description = "",
+					.pin_no = AT91_PIN_PC25,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "uC_in2",
+					.description = "",
+					.pin_no = AT91_PIN_PC28,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "uC_in3",
+					.description = "",
+					.pin_no = AT91_PIN_PC30,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "uC_in4",
+					.description = "",
+					.pin_no = AT91_PIN_PC29,
+					.flags = GPIOF_DIR_IN | GPIOF_PULLUP | GPIOF_POLLABLE | GPIOF_DEGLITCH
+				},
+				{
+					.function = INDIGO_FUNCTION_NO_FUNCTION,
+					.schematics_name = "POWER_ON_USB",
+					.description = "",
+					.pin_no = AT91_PIN_PA9,
+					.flags = GPIOF_DIR_OUT_INIT_HIGH
+				},
+			}
 		}
 	}
 };
@@ -340,6 +385,13 @@ static struct mcp251x_platform_data mcp251x_info = {
 	.power_enable         = NULL,
 };
 
+static struct lis3lv02d_platform_data acc_data = {
+	.irq_cfg = 0,
+	.irq_flags1 = (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING), /* Additional irq edge / level flags */
+	.irq_flags2 = 0, /* Additional irq edge / level flags */
+	.irq2 = 0
+};
+
 /*
  * SPI devices.
  */
@@ -361,22 +413,48 @@ static struct spi_board_info ek_spi_devices[] = {
 		.irq           = 0,
 	},
 	{
-		.modalias     = "lis3lv02d", // accelerometer
-		.chip_select  = 2,
-		.max_speed_hz = 8 * 1000 * 1000,
-		.bus_num      = 1,
-		.irq          = 0,
+		.modalias      = "lis3lv02d", // accelerometer
+		.chip_select   = 2,
+		.max_speed_hz  = 8 * 1000 * 1000,
+		.bus_num       = 1,
+		.platform_data = &acc_data,
+		.irq           = 0,
 	}
 };
 
-static void setup_spi_devices(int revision)
+void setup_spi_devices(void)
 {
-	switch (revision) {
+	int pin = -1;
+	switch (indigo_revision) {
 	case DEVICE_2_2:
-		ek_spi_devices[0].irq = gpio_to_irq(AT91_PIN_PD12); /* FIXME: TO BE CHANGED LATER */
-		ek_spi_devices[1].irq = gpio_to_irq(AT91_PIN_PB1);
-		ek_spi_devices[2].irq = gpio_to_irq(AT91_PIN_PA22);
+		// CAN
+		ek_spi_devices[0].irq = gpio_to_irq(AT91_PIN_PA26);
+
+                // GYRO
+		pin = AT91_PIN_PB1;
+		ek_spi_devices[1].irq = gpio_to_irq(pin);
+		if (gpio_request(pin, "L3GD20 INT")) {
+			printk(KERN_ERR "L3GD20 INT failed to request INT\n");
+			BUG();
+		}
+
+		gpio_direction_input(pin);
+		at91_set_deglitch(pin, 1);
+
+		// ACCELEROMETER
+		pin = AT91_PIN_PA22;
+		ek_spi_devices[2].irq = gpio_to_irq(pin);
+		if (gpio_request(pin, "lis3lv02d INT")) {
+			printk(KERN_ERR "lis3lv02d failed to request INT\n");
+			BUG();
+		}
+
+		gpio_direction_input(pin);
+		at91_set_deglitch(pin, 1);
+
 		break;
+	default:
+		BUG();
 	}
 }
 
@@ -387,6 +465,7 @@ int setup_can_device(struct spi_device *device)
 	int reset_pin = -1;
 	int interrupt_pin = -1;
 	int phy_mode_pin = -1;
+	int phy_shutdown = -1;
 
 	switch (indigo_revision) {
 	case DEVICE_2_1:
@@ -398,8 +477,9 @@ int setup_can_device(struct spi_device *device)
 	case DEVICE_2_2:
 		ek_spi_devices[0].bus_num = 1;
 		reset_pin = AT91_PIN_PA28;
-		interrupt_pin = AT91_PIN_PB1;
+		interrupt_pin = AT91_PIN_PA26;
 		phy_mode_pin = AT91_PIN_PA29;
+		phy_shutdown = AT91_PIN_PB2;
 		break;
 	default:
 		break;
@@ -429,6 +509,15 @@ int setup_can_device(struct spi_device *device)
 	gpio_direction_input(interrupt_pin);
 	at91_set_deglitch(interrupt_pin, 1);
 
+
+	if (gpio_request(phy_shutdown, "CAN PHY shutdown pin")) {
+		printk(KERN_ERR "CAN PHY shutdown pin failed\n");
+		return -EBUSY;
+	} else {
+		/* set reset pin to inactive state */
+		gpio_direction_output(phy_shutdown, 0);
+	}
+
 	return 0;
 }
 
@@ -439,7 +528,7 @@ int setup_can_device(struct spi_device *device)
 static struct mci_platform_data __initdata mci0_data = {
 	.slot[0] = {
 		.bus_width	= 4,
-		.detect_pin	= AT91_PIN_PA21,
+		.detect_pin	= AT91_PIN_PB0,
 		.wp_pin		= -EINVAL,
 	},
 };
@@ -459,6 +548,13 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
 		.offset	= MTDPART_OFS_NXTBLK,
 		.size	= MTDPART_SIZ_FULL,
 	},
+	#if 0
+	{
+		.name	= "Volatile data",
+		.offset	= MTDPART_OFS_NXTBLK,
+		.size	= MTDPART_SIZ_FULL,
+	},
+	#endif
 };
 
 /* det_pin is not connected */
@@ -469,7 +565,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
 	.enable_pin	= AT91_PIN_PC14,
 	.det_pin	= -EINVAL,
 	.ecc_mode       = NAND_ECC_SOFT,
-        .on_flash_bbt   = 1,
+	.on_flash_bbt   = 0,
 	.parts		= ek_nand_partition,
 	.num_parts	= ARRAY_SIZE(ek_nand_partition),
 };
@@ -609,8 +705,8 @@ static struct gpio_keys_button ek_buttons[] = {
 
 };
 
-static void setup_keys(int revision) {
-	switch (revision) {
+static void setup_keys(void) {
+	switch (indigo_revision) {
 	case DEVICE_2_2:
 		ek_buttons[0].code = KEY_ENTER;
 		ek_buttons[0].gpio = AT91_PIN_PA11;
@@ -653,10 +749,14 @@ static void __init ek_add_device_buttons(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(ek_buttons); i++) {
-		/* на 2.1 кнопки физически подтянуты вниз, не делаем pullup */
-		at91_set_GPIO_periph(ek_buttons[i].gpio, 0);
-		at91_set_deglitch(ek_buttons[i].gpio, 1);
+	if (indigo_revision == DEVICE_2_1) {
+		for (i = 0; i < ARRAY_SIZE(ek_buttons); i++) {
+			/* на 2.1 кнопки физически подтянуты вниз, не делаем pullup */
+			at91_set_GPIO_periph(ek_buttons[i].gpio, 0);
+			at91_set_deglitch(ek_buttons[i].gpio, 1);
+		}
+	} else {
+		// а на 2.2 вверх
 	}
 
 	platform_device_register(&ek_button_device);
@@ -668,7 +768,7 @@ static void __init ek_add_device_buttons(void) {}
 static struct gpio_led ek_leds[] = {
         {       /* "are we still alive" */
                 .name                   = "alive",
-                .gpio                   = AT91_PIN_PC27,
+                .gpio                   = AT91_PIN_PA27,
                 .default_trigger        = "heartbeat",
         },
 };
@@ -720,7 +820,7 @@ enum general_peripherals {
 
 static int setup_rs485(void) {
 	int receiver_enable_pin = -1;
-	//	int driver_enable_pin = -1;
+	int driver_enable_pin = -1;
 
 	switch (indigo_revision) {
 	case DEVICE_2_1:
@@ -731,24 +831,38 @@ static int setup_rs485(void) {
 		   driver_enable_pin = AT91_PIN_PA23;
 		*/
 		break;
+	case DEVICE_2_2:
+		//receiver_enable_pin = AT91_PIN_PA24;
+		//driver_enable_pin   = AT91_PIN_PA23;
 	default:
 		break;
 	}
 
-	if (gpio_request(receiver_enable_pin, "ADM3485 RE")) {
-		printk(KERN_ERR "ADM3485 failed to request RE\n");
-		return -EBUSY;
+	if (receiver_enable_pin != -1) {
+		if (gpio_request(receiver_enable_pin, "ADM3485 RE")) {
+			printk(KERN_ERR "ADM3485 failed to request RE\n");
+			return -EBUSY;
+		}
+
+		/* set reset pin to inactive state */
+		gpio_direction_output(receiver_enable_pin, 0);
 	}
 
-	/* set reset pin to inactive state */
-	gpio_direction_output(receiver_enable_pin, 0);
+	if (driver_enable_pin != -1) {
+		if (gpio_request(driver_enable_pin, "ADM3485 DE")) {
+			printk(KERN_ERR "ADM3485 failed to request DE\n");
+			return -EBUSY;
+		}
+
+		gpio_direction_output(driver_enable_pin, 1);
+	}
 
 	return 0;
 }
 
-void handle_device_versions(int revision)
+void handle_device_versions(void)
 {
-	switch (revision) {
+	switch (indigo_revision) {
 	case DEVICE_2_1:
 		break;
 	case DEVICE_2_2:
@@ -760,7 +874,7 @@ static void __init ek_board_init(void)
 {
 	int kind = 0, j = 0;
 
-	handle_device_versions(indigo_revision);
+	handle_device_versions();
 
 	/* DGBU on ttyS0. (Rx & Tx only) */
 	at91_register_uart(0, 0, 0);
@@ -787,13 +901,13 @@ static void __init ek_board_init(void)
 
 	/* USB HS Host */
 	if (indigo_hardware & p_usb) {
-		at91_add_device_usbh_ohci(&ek_usbh_hs_data);
 		at91_add_device_usbh_ehci(&ek_usbh_hs_data);
+		at91_add_device_usbh_ohci(&ek_usbh_hs_data);
 	} else
 		printk(KERN_INFO "not enabling USB, fix system_rev\n");
 
         /* SPI */
-	setup_spi_devices(indigo_revision);
+	setup_spi_devices();
 	if (indigo_hardware & p_spi)
 		at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
 	else
@@ -810,17 +924,19 @@ static void __init ek_board_init(void)
 	if (indigo_hardware & p_lcd) {
 		at91_add_device_lcdc(&ek_lcdc_data);
 		gpio_request(AT91_PIN_PA24, "backlight");
-		gpio_direction_output(AT91_PIN_PA24, 1);
+		gpio_direction_output(AT91_PIN_PA24, 0);
 	} else
 		printk(KERN_INFO "not enabling LCD, fix system rev\n");
 
 	/* FIXME conditional enabling */
 	/* ADC */
 	at91_add_device_adc(&ek_adc_data);
-	/* Push Buttons */
-	setup_keys(indigo_revision);
+
+        /* Push Buttons */
+	setup_keys();
 	ek_add_device_buttons();
-	/* LEDs */
+
+        /* LEDs */
 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
 	/* AC97 */
 	if (indigo_hardware & p_ac97)
