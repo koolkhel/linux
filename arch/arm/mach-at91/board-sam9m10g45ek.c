@@ -694,23 +694,23 @@ static struct gpio_keys_button ek_buttons[] = {
 static void setup_keys(void) {
 	switch (indigo_revision) {
 	case DEVICE_2_2:
-		ek_buttons[0].code = KEY_ENTER;
-		ek_buttons[0].gpio = AT91_PIN_PA11;
+		ek_buttons[4].code = KEY_ENTER;
+		ek_buttons[4].gpio = AT91_PIN_PA11;
 
-		ek_buttons[1].code = KEY_ESC;
-		ek_buttons[1].gpio = AT91_PIN_PA18;
+		ek_buttons[5].code = KEY_ESC;
+		ek_buttons[5].gpio = AT91_PIN_PA18;
 
-		ek_buttons[2].code = KEY_DOWN;
-		ek_buttons[2].gpio = AT91_PIN_PD14;
+		ek_buttons[3].code = KEY_DOWN;
+		ek_buttons[3].gpio = AT91_PIN_PD14;
 
-		ek_buttons[3].code = KEY_RIGHT;
-		ek_buttons[3].gpio = AT91_PIN_PD10;
+		ek_buttons[1].code = KEY_RIGHT;
+		ek_buttons[1].gpio = AT91_PIN_PD10;
 
-		ek_buttons[4].code = KEY_UP;
-		ek_buttons[4].gpio = AT91_PIN_PB25;
+		ek_buttons[2].code = KEY_UP;
+		ek_buttons[2].gpio = AT91_PIN_PB25;
 
-		ek_buttons[5].code = KEY_LEFT;
-		ek_buttons[5].gpio = AT91_PIN_PB28;
+		ek_buttons[0].code = KEY_LEFT;
+		ek_buttons[0].gpio = AT91_PIN_PB28;
 		break;
 	default:
 		break;
